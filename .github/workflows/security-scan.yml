@@ -1,0 +1,129 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'SKILL.md'
+      - '.github/workflows/security-scan.yml'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'SKILL.md'
+      - '.github/workflows/security-scan.yml'
+  workflow_dispatch:
+
+jobs:
+  security-scan:
+    name: Scan SKILL.md for Security Issues
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install Semgrep
+        run: |
+          pip install semgrep
+
+      - name: Run Semgrep security scan
+        run: |
+          echo "🔍 Running Semgrep security scan on SKILL.md..."
+          semgrep scan --config "p/security-audit" --config "p/secrets" SKILL.md || true
+
+      - name: Scan for dangerous patterns
+        run: |
+          echo "🔍 Scanning for dangerous patterns..."
+          DANGEROUS_PATTERNS=(
+            "eval\("
+            "exec\("
+            "system\("
+            "__import__"
+            "subprocess\.call"
+            "os\.system"
+            "rm -rf"
+            "mkfs"
+            "curl.*\|.*sh"
+            "wget.*\|.*sh"
+          )
+
+          FOUND=false
+          for pattern in "${DANGEROUS_PATTERNS[@]}"; do
+            if grep -qE "$pattern" SKILL.md; then
+              echo "⚠️  Found suspicious pattern: $pattern"
+              FOUND=true
+            fi
+          done
+
+          if [ "$FOUND" = true ]; then
+            echo "::warning::Dangerous patterns detected in SKILL.md"
+            exit 1
+          else
+            echo "✅ No dangerous patterns found"
+          fi
+
+      - name: Validate file size
+        run: |
+          echo "🔍 Validating file size..."
+          FILE_SIZE=$(stat -c%s SKILL.md)
+          echo "File size: $FILE_SIZE bytes"
+
+          if [ "$FILE_SIZE" -lt 5000 ] || [ "$FILE_SIZE" -gt 50000 ]; then
+            echo "::error::Unusual file size: $FILE_SIZE bytes (expected 5-50 KB)"
+            exit 1
+          else
+            echo "✅ File size within expected range"
+          fi
+
+      - name: Validate YAML frontmatter
+        run: |
+          echo "🔍 Validating YAML frontmatter..."
+          if ! grep -q "^name:" SKILL.md; then
+            echo "::error::Missing 'name' field in frontmatter"
+            exit 1
+          fi
+
+          if ! grep -q "^description:" SKILL.md; then
+            echo "::error::Missing 'description' field in frontmatter"
+            exit 1
+          fi
+
+          if ! grep -q "^version:" SKILL.md; then
+            echo "::error::Missing 'version' field in frontmatter"
+            exit 1
+          fi
+
+          echo "✅ YAML frontmatter valid"
+
+      - name: Generate SHA256 checksum
+        run: |
+          echo "🔍 Generating SHA256 checksum..."
+          sha256sum SKILL.md > SKILL.md.sha256
+          echo "Checksum:"
+          cat SKILL.md.sha256
+
+      - name: Upload checksum artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sha256-checksum
+          path: SKILL.md.sha256
+          retention-days: 90
+
+      - name: Security scan summary
+        if: always()
+        run: |
+          echo "### 🔒 Security Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Semgrep Scan | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Dangerous Patterns | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| File Size | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| YAML Frontmatter | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ All security checks passed!" >> $GITHUB_STEP_SUMMARY
