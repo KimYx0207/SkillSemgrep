@@ -1,3 +1,5 @@
+[中文](./README.md) | [English](./README_EN.md)
+
 # Claude Code 安全扫描 Skill
 
 <div align="center">
