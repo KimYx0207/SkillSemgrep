@@ -11,6 +11,8 @@
 
 </div>
 
+> 因合并关系，本仓库已迁入 [Kim Service](https://github.com/KimYx0207/Kim_Service) 合集，不再单独发布新版本。请前往 Kim Service 获取新版本、安装说明和更新记录。
+
 > 老金的开源知识库，实时更新群二维码：https://my.feishu.cn/wiki/OhQ8wqntFihcI1kWVDlcNdpznFf
 
 ## 📞 联系方式
